@@ -1,7 +1,8 @@
 (ns diffusion.jena
     (:require [plaza.rdf.core :as prc]
               plaza.rdf.implementations.jena)
-    (:import (com.hp.hpl.jena.query Dataset DatasetFactory DataSource QueryExecutionFactory Syntax)
+    (:import (com.hp.hpl.jena.query  Dataset DatasetFactory DataSource QueryExecutionFactory Syntax)
+             (com.hp.hpl.jena.update UpdateAction)
              (plaza.rdf.implementations.jena JenaModel)))
 
 ; Functions copied from plaza.rdf.implementations.jena
@@ -22,7 +23,12 @@
           (let [qexec (QueryExecutionFactory/create query-string Syntax/syntaxSPARQL_11 (prc/to-java model-or-dataset))
                 results (iterator-seq (.execSelect qexec))]
             (map #(process-query-result model-or-dataset %1) results)))))
-            
+
+(defn direct-update [model-or-dataset update-string]
+    (prc/model-critical-write model-or-dataset
+        (UpdateAction/parseExecute update-string (prc/to-java model-or-dataset))
+        model-or-dataset))
+
 (defprotocol RDFDataset
     "Operations for accessing models in a named-graph"
     (contains-named-model [dataset uri])

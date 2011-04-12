@@ -33,4 +33,31 @@
         (add-named-model "uri" (prc/build-model))
         (remove-named-model "uri")
         (contains-named-model "uri")) => falsey)
-        
+
+(fact "We can insert into the default graph"
+    (let [[only & _] (-> (build-datasource)
+                         (direct-update "PREFIX dummy: <http://dummy.org/>
+                                         INSERT DATA {dummy:a dummy:b dummy:c}")
+                         (direct-query "SELECT ?s ?p ?o WHERE { ?s ?p ?o . }"))]
+             (prc/qname-prefix (:?s only)) => "http://dummy.org/"
+             (prc/qname-prefix (:?p only)) => "http://dummy.org/"
+             (prc/qname-prefix (:?o only)) => "http://dummy.org/"
+             (prc/qname-local (:?s only)) => "a"
+             (prc/qname-local (:?p only)) => "b"
+             (prc/qname-local (:?o only)) => "c"))
+             
+(fact "We can insert into any graph"
+    (let [[only & _] (-> (build-datasource)
+                         (add-named-model "http://dummy.org/g" (prc/build-model))
+                         (direct-update "PREFIX dummy: <http://dummy.org/>
+                                         INSERT DATA INTO dummy:g
+                                         {dummy:a dummy:b dummy:c}")
+                         (direct-query "PREFIX dummy: <http://dummy.org/>
+                                        SELECT ?s ?p ?o 
+                                        WHERE { GRAPH dummy:g { ?s ?p ?o . }}"))]
+              (prc/qname-prefix (:?s only)) => "http://dummy.org/"
+              (prc/qname-prefix (:?p only)) => "http://dummy.org/"
+              (prc/qname-prefix (:?o only)) => "http://dummy.org/"
+              (prc/qname-local (:?s only)) => "a"
+              (prc/qname-local (:?p only)) => "b"
+              (prc/qname-local (:?o only)) => "c"))
