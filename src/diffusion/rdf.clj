@@ -81,7 +81,7 @@
                   PREFIX item: <%3$s>
                   PREFIX tag: <%4$s>
                   SELECT (COUNT(?elem) AS ?counter)
-                  WHERE { %5$s diffusion:%6$s %7$s . }"
+                  WHERE { %5$s diffusion:%6$s %7$s }"
                   (prc/find-ns-registry :diffusion)
                   (prc/find-ns-registry :user)
                   (prc/find-ns-registry :item)
@@ -119,7 +119,7 @@
 (defn count-of-type [datasource type]
     (->> (format "PREFIX diffusion: <%1$s>
                   SELECT (COUNT(?elem) AS ?counter) 
-                  WHERE { ?elem a diffusion:%2$s . }" 
+                  WHERE { ?elem a diffusion:%2$s }" 
                   (prc/find-ns-registry :diffusion)
                   (plaza.utils/keyword-to-string type))
          (dj/direct-query datasource)
@@ -142,7 +142,7 @@
                   PREFIX item: <%3$s>
                   PREFIX tag: <%4$s>
                   SELECT ?elem
-                  WHERE { %5$s diffusion:%6$s %7$s . }"
+                  WHERE { %5$s diffusion:%6$s %7$s }"
                   (prc/find-ns-registry :diffusion)
                   (prc/find-ns-registry :user)
                   (prc/find-ns-registry :item)
@@ -170,7 +170,7 @@
     (->> (format "PREFIX diffusion: <%1$s>
                   PREFIX user: <%2$s>
                   SELECT ?item
-                  WHERE { ?item a diffusion:Item .
+                  WHERE { ?item a diffusion:Item 
                           FILTER NOT EXISTS { user:%3$s diffusion:has-reviewed ?item } }"
                   (prc/find-ns-registry :diffusion)
                   (prc/find-ns-registry :user)
@@ -181,6 +181,11 @@
 
 ;; Activations
 
+(defn- create-namedgraph-if-needed [datasource uri]
+    (if (dj/contains-named-model datasource uri)
+        datasource
+        (dj/add-named-model datasource uri (prc/build-model))))
+    
 (defn initial-activations [datasource user]
     (let [activation-ns (prc/find-ns-registry :activation)
           user-ns (prc/find-ns-registry :user)
@@ -207,9 +212,74 @@
                            activation-ns
                            user)]
           (-> datasource
-              (dj/add-named-model (str activation-ns user) (prc/build-model))
+              (create-namedgraph-if-needed (str activation-ns user))
               (dj/direct-update update0)
               (dj/direct-update update1))))
           
+(defn counts-users-to-items [datasource]
+    (let [activation-ns (prc/find-ns-registry :activation)
+          diffusion-ns (prc/find-ns-registry :diffusion)
+          sparql (format "PREFIX diffusion:<%1$s>
+                          PREFIX activation:<%2$s>
+                          INSERT INTO activation:counters
+                          { ?user diffusion:num-items ?counter }
+                          WHERE { { SELECT ?user (COUNT(distinct ?item) AS ?counter)
+                                    WHERE { ?user a diffusion:User .
+                                            ?user diffusion:has-reviewed ?item }
+                                    GROUP BY ?user}}"
+                          diffusion-ns
+                          activation-ns)]
+        (-> datasource
+            (create-namedgraph-if-needed (str activation-ns "counters"))
+            (dj/direct-update sparql))))
 
+(defn counts-items-to-users [datasource]
+    (let [activation-ns (prc/find-ns-registry :activation)
+          diffusion-ns (prc/find-ns-registry :diffusion)
+          sparql (format "PREFIX diffusion:<%1$s>
+                          PREFIX activation:<%2$s>
+                          INSERT INTO activation:counters
+                          { ?item diffusion:num-users ?counter }
+                          WHERE { { SELECT ?item (COUNT(distinct ?user) AS ?counter)
+                                    WHERE { ?item a diffusion:Item .
+                                            ?user diffusion:has-reviewed ?item }
+                                    GROUP BY ?item}}"
+                          diffusion-ns
+                          activation-ns)]
+        (-> datasource
+            (create-namedgraph-if-needed (str activation-ns "counters"))
+            (dj/direct-update sparql))))        
+
+(defn counts-items-to-tags [datasource]
+    (let [activation-ns (prc/find-ns-registry :activation)
+          diffusion-ns (prc/find-ns-registry :diffusion)
+          sparql (format "PREFIX diffusion:<%1$s>
+                          PREFIX activation:<%2$s>
+                          INSERT INTO activation:counters
+                          { ?item diffusion:num-tags ?counter }
+                          WHERE { { SELECT ?item (COUNT(distinct ?tag) AS ?counter)
+                                    WHERE { ?item a diffusion:Item .
+                                            ?item diffusion:has-tag ?tag }
+                                    GROUP BY ?item}}"
+                          diffusion-ns
+                          activation-ns)]
+        (-> datasource
+            (create-namedgraph-if-needed (str activation-ns "counters"))
+            (dj/direct-update sparql))))
      
+(defn counts-tags-to-items [datasource]
+    (let [activation-ns (prc/find-ns-registry :activation)
+          diffusion-ns (prc/find-ns-registry :diffusion)
+          sparql (format "PREFIX diffusion:<%1$s>
+                          PREFIX activation:<%2$s>
+                          INSERT INTO activation:counters
+                          { ?tag diffusion:num-items ?counter }
+                          WHERE { { SELECT ?tag (COUNT(distinct ?item) AS ?counter)
+                                    WHERE { ?tag a diffusion:Tag .
+                                            ?item diffusion:has-tag ?tag }
+                                    GROUP BY ?tag}}"
+                          diffusion-ns
+                          activation-ns)]
+        (-> datasource
+            (create-namedgraph-if-needed (str activation-ns "counters"))
+            (dj/direct-update sparql))))

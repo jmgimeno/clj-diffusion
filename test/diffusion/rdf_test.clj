@@ -159,6 +159,9 @@
                 (tag-item "i4" "t4")
                 (tag-item "i5" "t3")))
                 
+(defn- to-map [result]
+    (into {} (map (fn [r] [(prc/qname-local (:?s r)) (prc/literal-value (:?o r))]) result)))
+
 (fact "The initial activations for a user are 1.0 for the items reviewed and zero otherwise"
     (let [dataset (initial-activations graph2 "u1")
           query "PREFIX diffusion: <http://rhizomik.net/diffusion#>
@@ -166,6 +169,38 @@
                  SELECT ?s ?o
                  WHERE { GRAPH activation:u1 {?s diffusion:has-activation ?o}}"
           result (dj/direct-query dataset query)]     
-          (into {} (map (fn [t] [(prc/qname-local (:?s t)) (prc/literal-value (:?o t))]) result)))
-              
-    => {"i1" 1.0 "i2" 0.0 "i3" 1.0 "i4" 0.0 "i5" 1.0})
+          (to-map result)) => {"i1" 1.0 "i2" 0.0 "i3" 1.0 "i4" 0.0 "i5" 1.0})
+    
+(facts "We can count users->items, items->tags, items->users, tags->items"
+    (let [dataset (counts-users-to-items graph2)
+          query "PREFIX diffusion: <http://rhizomik.net/diffusion#>
+                 PREFIX activation: <http://rhizomik.net/diffusion/activation/> 
+                 SELECT ?s ?o
+                 WHERE { { ?s a diffusion:User }
+                         GRAPH activation:counters { ?s diffusion:num-items ?o } }"
+          result (dj/direct-query dataset query)]
+          (to-map result)) => {"u1" 3 "u2" 3 "u3" 4}
+    (let [dataset (counts-items-to-users graph2)
+          query "PREFIX diffusion: <http://rhizomik.net/diffusion#>
+                 PREFIX activation: <http://rhizomik.net/diffusion/activation/> 
+                 SELECT ?s ?o
+                 WHERE { { ?s a diffusion:Item }
+                         GRAPH activation:counters { ?s diffusion:num-users ?o } }"
+          result (dj/direct-query dataset query)]
+          (to-map result)) => {"i1" 2 "i2" 2 "i3" 2 "i4" 2 "i5" 2}
+    (let [dataset (counts-items-to-tags graph2)
+          query "PREFIX diffusion: <http://rhizomik.net/diffusion#>
+                 PREFIX activation: <http://rhizomik.net/diffusion/activation/> 
+                 SELECT ?s ?o
+                 WHERE { { ?s a diffusion:Item }
+                       GRAPH activation:counters { ?s diffusion:num-tags ?o } }"
+          result (dj/direct-query dataset query)]
+          (to-map result)) => {"i1" 3 "i2" 2 "i3" 2 "i4" 2 "i5" 1}
+    (let [dataset (counts-tags-to-items graph2)
+        query "PREFIX diffusion: <http://rhizomik.net/diffusion#>
+               PREFIX activation: <http://rhizomik.net/diffusion/activation/> 
+               SELECT ?s ?o
+               WHERE { { ?s a diffusion:Tag }
+                     GRAPH activation:counters { ?s diffusion:num-items ?o } }"
+        result (dj/direct-query dataset query)]
+        (to-map result)) => {"t1" 2 "t2" 2 "t3" 3 "t4" 3})

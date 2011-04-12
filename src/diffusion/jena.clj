@@ -26,6 +26,8 @@
 
 (defn direct-update [model-or-dataset update-string]
     (prc/model-critical-write model-or-dataset
+        ; (-> (UpdateFactory/create update-string Syntax/syntaxSPARQL_11)
+        ;     (UpdateAction/execute (prc/to-java model-or-dataset)))
         (UpdateAction/parseExecute update-string (prc/to-java model-or-dataset))
         model-or-dataset))
 
