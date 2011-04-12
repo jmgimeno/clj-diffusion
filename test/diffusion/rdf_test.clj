@@ -2,7 +2,8 @@
     (:use diffusion.rdf
           clojure.test
           midje.sweet)
-    (:require [plaza.rdf.core :as prc]
+    (:require [diffusion.jena :as dj]
+              [plaza.rdf.core :as prc]
               [plaza.rdf.sparql :as prs]))
 
 (facts "We can detect which type a node has"
@@ -17,11 +18,13 @@
     (tag?  (make-tag  .any.)) => truthy)
     
 (fact "A new create graph has no nodes"
-    (prc/model-to-triples (new-graph)) => (just []))
+    (all-users (new-graph)) => empty?
+    (all-items (new-graph)) => empty?
+    (all-tags  (new-graph)) => empty?)
             
 (defn contains-only-one-with? [type elem]
-    (fn [model]
-        (let [[only :as result] (all-of-type model type)]
+    (fn [datasource]
+        (let [[only :as result] (all-of-type datasource type)]
             (is (= (count result) 1))
             (is (= only elem)))))
             
@@ -44,15 +47,15 @@
                                   [:?item [:diffusion :has-tag] :?tag]]))))
 
 (defn contains-only-one-review-with [user item]
-    (fn [model]
-        (let [[only :as result] (prs/model-query model all-reviews)]
+    (fn [datasource]
+        (let [[only :as result] (prs/model-query (dj/default-model datasource) all-reviews)]
             (is (= (count result) 1))
             (is (= (:?user only) (make-user user)))
             (is (= (:?item only) (make-item item))))))
             
 (defn contains-only-one-tagged-item-with [item tag]
-    (fn [model]
-        (let [[only :as result] (prs/model-query model all-tagged-items)]
+    (fn [datasource]
+        (let [[only :as result] (prs/model-query (dj/default-model datasource) all-tagged-items)]
             (is (= (count result) 1))
             (is (= (:?item only) (make-item item)))
             (is (= (:?tag only) (make-tag tag))))))

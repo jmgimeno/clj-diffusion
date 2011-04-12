@@ -1,9 +1,9 @@
 (ns diffusion.rdf
-    (:use [diffusion.jena :only [direct-query]])
-    (:require [plaza.rdf.core :as prc]
-              [plaza.rdf.sparql :as psparql]
+    (:require [diffusion.jena :as dj]
+              [plaza.rdf.core :as prc]
+              [plaza.rdf.sparql :as prs]
               plaza.rdf.implementations.jena
-              [plaza.utils :as putils]))
+              plaza.utils))
 
 (plaza.rdf.implementations.jena/init-jena-framework)
 
@@ -34,47 +34,47 @@
        (prc/find-ns-registry :tag)))
     
 (defn new-graph []
-    (prc/build-model))
+    (dj/build-datasource))
 
-(defn add-user [model user]
-    (prc/with-model model
+(defn add-user [datasource user]
+    (prc/with-model (dj/default-model datasource)
         (prc/model-add-triples 
             [[(make-user user) prc/rdf:type [:diffusion :User]]]))
-    model)
+    datasource)
 
-(defn add-item [model item]
-    (prc/with-model model
+(defn add-item [datasource item]
+    (prc/with-model (dj/default-model datasource)
         (prc/model-add-triples 
             [[(make-item item) prc/rdf:type [:diffusion :Item]]]))
-    model)
+    datasource)
     
-(defn add-tag [model tag]
-    (prc/with-model model
+(defn add-tag [datasource tag]
+    (prc/with-model (dj/default-model datasource)
         (prc/model-add-triples 
             [[(make-tag tag) prc/rdf:type [:diffusion :Tag]]]))
-    model)
+    datasource)
     
-(defn add-review [model user item]
+(defn add-review [datasource user item]
     (let [user-resource (make-user user)
           item-resource (make-item item)]
-        (prc/with-model model
-            (add-user model user)
-            (add-item model item)
+        (add-user datasource user)
+        (add-item datasource item)
+        (prc/with-model (dj/default-model datasource)
             (prc/model-add-triples
                 [[user-resource [:diffusion :has-reviewed] item-resource]]))
-        model))
+        datasource))
 
-(defn tag-item [model item tag]
+(defn tag-item [datasource item tag]
     (let [item-resource (make-item item)
           tag-resource (make-tag tag)]
-        (prc/with-model model
-            (add-item model item)
-            (add-tag model tag)
+        (add-item datasource item)
+        (add-tag datasource tag)
+        (prc/with-model (dj/default-model datasource)
             (prc/model-add-triples
                 [[item-resource [:diffusion :has-tag] tag-resource]]))
-        model))
+        datasource))
      
-(defn- count-relation [model {subject :subject property :property object :object}]
+(defn- count-relation [datasource {subject :subject property :property object :object}]
     (->> (format "PREFIX diffusion: <%1$s> 
                   PREFIX user: <%2$s>
                   PREFIX item: <%3$s>
@@ -88,54 +88,54 @@
                   (if subject subject "?elem")
                   property
                   (if object object "?elem"))
-         (direct-query model)
+         (dj/direct-query (dj/default-model datasource))
          first
          :?counter
          prc/literal-value))
 
-(defn count-reviews-of-user [model user]
-    (count-relation model {:subject (format "user:%s" user) :property "has-reviewed"}))
+(defn count-reviews-of-user [datasource user]
+    (count-relation datasource {:subject (format "user:%s" user) :property "has-reviewed"}))
 
-(defn count-reviewers-of-item [model item]
-    (count-relation model {:object (format "item:%s" item) :property "has-reviewed"}))
+(defn count-reviewers-of-item [datasource item]
+    (count-relation datasource {:object (format "item:%s" item) :property "has-reviewed"}))
 
-(defn count-tags-of-item [model item]
-    (count-relation model {:subject (format "item:%s" item) :property "has-tag"}))
+(defn count-tags-of-item [datasource item]
+    (count-relation datasource {:subject (format "item:%s" item) :property "has-tag"}))
 
-(defn count-items-with-tag [model tag]
-    (count-relation model {:object (format "tag:%s" tag) :property "has-tag"}))
+(defn count-items-with-tag [datasource tag]
+    (count-relation datasource {:object (format "tag:%s" tag) :property "has-tag"}))
 
-(defn all-of-type [model type]
-    (->> (psparql/defquery
-            (psparql/query-set-type :select)
-            (psparql/query-set-vars [:?elem])
-            (psparql/query-set-pattern
-                (psparql/make-pattern [[:?elem prc/rdf:type [:diffusion type]]])))
-         (psparql/model-query model)
+(defn all-of-type [datasource type]
+    (->> (prs/defquery
+            (prs/query-set-type :select)
+            (prs/query-set-vars [:?elem])
+            (prs/query-set-pattern
+                (prs/make-pattern [[:?elem prc/rdf:type [:diffusion type]]])))
+         (prs/model-query (dj/default-model datasource))
          (map :?elem)
          (map prc/resource-qname-local)))
            
-(defn count-of-type [model type]
+(defn count-of-type [datasource type]
     (->> (format "PREFIX diffusion: <%1$s>
                   SELECT (COUNT(?elem) AS ?counter) 
                   WHERE { ?elem a diffusion:%2$s . }" 
                   (prc/find-ns-registry :diffusion)
-                  (putils/keyword-to-string type))
-         (direct-query model)
+                  (plaza.utils/keyword-to-string type))
+         (dj/direct-query (dj/default-model datasource))
          first
          :?counter
          prc/literal-value))
         
-(defn all-users [model]
-    (all-of-type model :User))
+(defn all-users [datasource]
+    (all-of-type datasource :User))
     
-(defn all-items [model]
-    (all-of-type model :Item))
+(defn all-items [datasource]
+    (all-of-type datasource :Item))
     
-(defn all-tags [model]
-    (all-of-type model :Tag))
+(defn all-tags [datasource]
+    (all-of-type datasource :Tag))
 
-(defn- get-relations-other [model {subject :subject property :property object :object}]
+(defn- get-relations-other [datasource {subject :subject property :property object :object}]
     (->> (format "PREFIX diffusion: <%1$s> 
                   PREFIX user: <%2$s>
                   PREFIX item: <%3$s>
@@ -149,23 +149,23 @@
                   (if subject subject "?elem")
                   property
                   (if object object "?elem"))
-         (direct-query model)
+         (dj/direct-query (dj/default-model datasource))
          (map :?elem)
          (map prc/resource-qname-local)))
              
-(defn reviewed-by [model item]
-    (get-relations-other model {:property "has-reviewed" :object (format "item:%s" item)}))
+(defn reviewed-by [datasource item]
+    (get-relations-other datasource {:property "has-reviewed" :object (format "item:%s" item)}))
 
-(defn reviews-of [model user]
-    (get-relations-other model {:subject (format "user:%s" user) :property "has-reviewed"}))
+(defn reviews-of [datasource user]
+    (get-relations-other datasource {:subject (format "user:%s" user) :property "has-reviewed"}))
          
-(defn tagged-with [model tag]
-    (get-relations-other model {:property "has-tag" :object (format "tag:%s" tag)}))
+(defn tagged-with [datasource tag]
+    (get-relations-other datasource {:property "has-tag" :object (format "tag:%s" tag)}))
 
-(defn tags-of [model item]
-    (get-relations-other model {:subject (format "item:%s" item) :property "has-tag"}))
+(defn tags-of [datasource item]
+    (get-relations-other datasource {:subject (format "item:%s" item) :property "has-tag"}))
     
-(defn new-items-for [model user]
+(defn new-items-for [datasource user]
     (->> (format "PREFIX diffusion: <%1$s>
                   PREFIX user: <%2$s>
                   SELECT ?item
@@ -174,7 +174,7 @@
                   (prc/find-ns-registry :diffusion)
                   (prc/find-ns-registry :user)
                   user)
-         (direct-query model)
+         (dj/direct-query (dj/default-model datasource))
          (map :?item)
          (map prc/resource-qname-local)))
 
