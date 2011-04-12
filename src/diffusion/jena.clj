@@ -70,7 +70,7 @@
     (query [datasource query] (prc/query (default-model datasource) query))
     (query-triples [datasource query] (prc/query-triples (default-model datasource) query))
     ; prc/JavaObjectWrapper
-    (prc/to-java [datasource] ds))
+    (to-java [datasource] ds))
 
     
 (defn build-datasource []
