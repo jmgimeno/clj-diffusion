@@ -37,19 +37,19 @@
     (dj/build-datasource))
 
 (defn add-user [datasource user]
-    (prc/with-model (dj/default-model datasource)
+    (prc/with-model datasource
         (prc/model-add-triples 
             [[(make-user user) prc/rdf:type [:diffusion :User]]]))
     datasource)
 
 (defn add-item [datasource item]
-    (prc/with-model (dj/default-model datasource)
+    (prc/with-model datasource
         (prc/model-add-triples 
             [[(make-item item) prc/rdf:type [:diffusion :Item]]]))
     datasource)
     
 (defn add-tag [datasource tag]
-    (prc/with-model (dj/default-model datasource)
+    (prc/with-model datasource
         (prc/model-add-triples 
             [[(make-tag tag) prc/rdf:type [:diffusion :Tag]]]))
     datasource)
@@ -59,7 +59,7 @@
           item-resource (make-item item)]
         (add-user datasource user)
         (add-item datasource item)
-        (prc/with-model (dj/default-model datasource)
+        (prc/with-model datasource
             (prc/model-add-triples
                 [[user-resource [:diffusion :has-reviewed] item-resource]]))
         datasource))
@@ -69,7 +69,7 @@
           tag-resource (make-tag tag)]
         (add-item datasource item)
         (add-tag datasource tag)
-        (prc/with-model (dj/default-model datasource)
+        (prc/with-model datasource
             (prc/model-add-triples
                 [[item-resource [:diffusion :has-tag] tag-resource]]))
         datasource))
@@ -88,7 +88,7 @@
                   (if subject subject "?elem")
                   property
                   (if object object "?elem"))
-         (dj/direct-query (dj/default-model datasource))
+         (dj/direct-query datasource)
          first
          :?counter
          prc/literal-value))
@@ -111,7 +111,7 @@
             (prs/query-set-vars [:?elem])
             (prs/query-set-pattern
                 (prs/make-pattern [[:?elem prc/rdf:type [:diffusion type]]])))
-         (prs/model-query (dj/default-model datasource))
+         (prs/model-query datasource)
          (map :?elem)
          (map prc/resource-qname-local)))
            
@@ -121,7 +121,7 @@
                   WHERE { ?elem a diffusion:%2$s . }" 
                   (prc/find-ns-registry :diffusion)
                   (plaza.utils/keyword-to-string type))
-         (dj/direct-query (dj/default-model datasource))
+         (dj/direct-query datasource)
          first
          :?counter
          prc/literal-value))
@@ -149,7 +149,7 @@
                   (if subject subject "?elem")
                   property
                   (if object object "?elem"))
-         (dj/direct-query (dj/default-model datasource))
+         (dj/direct-query datasource)
          (map :?elem)
          (map prc/resource-qname-local)))
              
@@ -174,7 +174,7 @@
                   (prc/find-ns-registry :diffusion)
                   (prc/find-ns-registry :user)
                   user)
-         (dj/direct-query (dj/default-model datasource))
+         (dj/direct-query datasource)
          (map :?item)
          (map prc/resource-qname-local)))
 
