@@ -89,12 +89,12 @@
               (contains-only-one-tagged-item-with "item" "tag")))
               
 (def graph1 (-> (new-graph)
-              (add-review "u1" "i1")
-              (add-review "u1" "i2")
-              (add-review "u2" "i2")
-              (tag-item "i1" "t1")
-              (tag-item "i1" "t2")
-              (tag-item "i2" "t1")))
+                (add-review "u1" "i1")
+                (add-review "u1" "i2")
+                (add-review "u2" "i2")
+                (tag-item "i1" "t1")
+                (tag-item "i1" "t2")
+                (tag-item "i2" "t1")))
 
 (facts "We can count the reviews made by a user"
   (count-reviews-of-user graph1 "u1") => 2
@@ -137,4 +137,31 @@
   (new-items-for graph1 "u1") => (just [])
   (new-items-for graph1 "u2") => (just "i1"))
 
-
+(def graph2 (-> (new-graph)
+                (add-review "u1" "i1")
+                (add-review "u1" "i3")
+                (add-review "u1" "i5")
+                (add-review "u2" "i2")
+                (add-review "u2" "i3")
+                (add-review "u2" "i4")
+                (add-review "u3" "i1")
+                (add-review "u3" "i2")
+                (add-review "u3" "i4")
+                (add-review "u3" "i5")
+                (tag-item "i1" "t1")
+                (tag-item "i1" "t2")
+                (tag-item "i1" "t4")
+                (tag-item "i2" "t1")
+                (tag-item "i2" "t3")
+                (tag-item "i3" "t2")
+                (tag-item "i3" "t4")
+                (tag-item "i4" "t3")
+                (tag-item "i4" "t4")
+                (tag-item "i5" "t3")))
+                
+;(fact "The initial activations for a user are 1.0 for the items reviewed and zero otherwise"
+(let [dataset (initial-activations graph2 "u1")
+      query (format "PREFIX activation: <http://rhizomik.net/diffusion/activation/> 
+                     SELECT ?s ?p ?o
+                     WHERE { GRAPH activation:u1 {?s ?p ?o}}")]
+     (dj/direct-query dataset query))

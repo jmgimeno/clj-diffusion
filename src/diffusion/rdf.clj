@@ -11,6 +11,7 @@
 (prc/register-rdf-ns :user "http://rhizomik.net/diffusion/user/")
 (prc/register-rdf-ns :item "http://rhizomik.net/diffusion/item/")
 (prc/register-rdf-ns :tag "http://rhizomik.net/diffusion/tag/")
+(prc/register-rdf-ns :activation "http://rhizomik.net/diffusion/activation/")
 
 (defn make-user [user]
     (prc/rdf-resource :user user))
@@ -178,6 +179,37 @@
          (map :?item)
          (map prc/resource-qname-local)))
 
+;; Activations
 
+(defn initial-activations [datasource user]
+    (let [activation-ns (prc/find-ns-registry :activation)
+          user-ns (prc/find-ns-registry :user)
+          diffusion-ns (prc/find-ns-registry :diffusion)
+          update0 (format "PREFIX diffusion: <%1$s>
+                           PREFIX user: <%2$s>
+                           PREFIX activation: <%3$s>
+                           INSERT INTO activation:%4$s
+                           { ?item diffusion:has-activation 0.0 }
+                           WHERE { ?item a diffusion:Item .
+                                   FILTER NOT EXISTS { user:%4$s diffusion:has-reviewed ?item } }"
+                           diffusion-ns
+                           user-ns
+                           activation-ns
+                           user)
+          update1 (format "PREFIX diffusion: <%1$s>
+                           PREFIX user: <%2$s>
+                           PREFIX activation: <%3$s>
+                           INSERT INTO activation:%4$s
+                           { ?item diffusion:has-activation 1.0 }
+                            WHERE { user:%4$s diffusion:has-reviewed ?item }"
+                           diffusion-ns
+                           user-ns
+                           activation-ns
+                           user)]
+          (-> datasource
+              (dj/add-named-model (str activation-ns user) (prc/build-model))
+              (dj/direct-update update0)
+              (dj/direct-update update1))))
+          
 
      
