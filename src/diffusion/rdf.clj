@@ -294,13 +294,12 @@
                           PREFIX xsd: <%3$s>
                           INSERT INTO activation:%4$s
                           { ?user diffusion:from-items ?accum }
-                          WHERE { SELECT ?user (SUM(?equity) AS ?accum)
-                                  WHERE { SELECT ?user (xsd:double(?activation/?degree) AS ?equity) 
-                                          WHERE { ?user a diffusion:User .
-                                                  ?user diffusion:has-reviewed ?item .
-                                                  GRAPH activation:%4$s { ?item diffusion:initial-activation ?activation }
-                                                  GRAPH activation:counters { ?item diffusion:num-users ?degree }}}
-                                  GROUP BY ?user}"
+                          WHERE { SELECT ?user (SUM(xsd:double(?activation/?degree)) AS ?accum)
+                                  WHERE  { ?user a diffusion:User .
+                                           ?user diffusion:has-reviewed ?item .
+                                           GRAPH activation:%4$s { ?item diffusion:initial-activation ?activation }
+                                           GRAPH activation:counters { ?item diffusion:num-users ?degree } }
+                                  GROUP BY ?user }"
                           diffusion-ns
                           activation-ns
                           xsd-ns
@@ -316,13 +315,12 @@
                           PREFIX xsd: <%3$s>
                           INSERT INTO activation:%4$s
                           { ?item diffusion:from-users ?accum }
-                          WHERE { SELECT ?item (SUM(?equity) AS ?accum)
-                                  WHERE { SELECT ?item (xsd:double(?activation/?degree) AS ?equity) 
-                                          WHERE { ?item a diffusion:Item .
-                                                  ?user diffusion:has-reviewed ?item .
-                                                  GRAPH activation:%4$s { ?user diffusion:from-items ?activation }
-                                                  GRAPH activation:counters { ?user diffusion:num-items ?degree }}}
-                                  GROUP BY ?item}"
+                          WHERE { SELECT ?item (SUM(xsd:double(?activation/?degree)) AS ?accum)
+                                  WHERE { ?item a diffusion:Item .
+                                          ?user diffusion:has-reviewed ?item .
+                                          GRAPH activation:%4$s { ?user diffusion:from-items ?activation }
+                                          GRAPH activation:counters { ?user diffusion:num-items ?degree } }
+                                  GROUP BY ?item }"
                           diffusion-ns
                           activation-ns
                           xsd-ns
