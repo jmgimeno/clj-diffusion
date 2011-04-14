@@ -1,0 +1,3 @@
+- Rename functions with side-effects on graph with !
+- Reorganize sparql queries
+- Use sparql for insertions (depend less on plaza)

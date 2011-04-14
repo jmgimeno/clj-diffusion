@@ -137,42 +137,43 @@
   (new-items-for graph1 "u1") => (just [])
   (new-items-for graph1 "u2") => (just "i1"))
 
-(def graph2 (-> (new-graph)
-                (add-review "u1" "i1")
-                (add-review "u1" "i3")
-                (add-review "u1" "i5")
-                (add-review "u2" "i2")
-                (add-review "u2" "i3")
-                (add-review "u2" "i4")
-                (add-review "u3" "i1")
-                (add-review "u3" "i2")
-                (add-review "u3" "i4")
-                (add-review "u3" "i5")
-                (tag-item "i1" "t1")
-                (tag-item "i1" "t2")
-                (tag-item "i1" "t4")
-                (tag-item "i2" "t1")
-                (tag-item "i2" "t3")
-                (tag-item "i3" "t2")
-                (tag-item "i3" "t4")
-                (tag-item "i4" "t3")
-                (tag-item "i4" "t4")
-                (tag-item "i5" "t3")))
+(defn mk-graph2 []
+    (-> (new-graph)
+        (add-review "u1" "i1")
+        (add-review "u1" "i3")
+        (add-review "u1" "i5")
+        (add-review "u2" "i2")
+        (add-review "u2" "i3")
+        (add-review "u2" "i4")
+        (add-review "u3" "i1")
+        (add-review "u3" "i2")
+        (add-review "u3" "i4")
+        (add-review "u3" "i5")
+        (tag-item "i1" "t1")
+        (tag-item "i1" "t2")
+        (tag-item "i1" "t4")
+        (tag-item "i2" "t1")
+        (tag-item "i2" "t3")
+        (tag-item "i3" "t2")
+        (tag-item "i3" "t4")
+        (tag-item "i4" "t3")
+        (tag-item "i4" "t4")
+        (tag-item "i5" "t3")))
                 
 (defn- to-map [result]
     (into {} (map (fn [r] [(prc/qname-local (:?s r)) (prc/literal-value (:?o r))]) result)))
 
 (fact "The initial activations for a user are 1.0 for the items reviewed and zero otherwise"
-    (let [dataset (initial-activations graph2 "u1")
+    (let [dataset (initial-activations (mk-graph2) "u1")
           query "PREFIX diffusion: <http://rhizomik.net/diffusion#>
                  PREFIX activation: <http://rhizomik.net/diffusion/activation/> 
                  SELECT ?s ?o
-                 WHERE { GRAPH activation:u1 {?s diffusion:has-activation ?o}}"
+                 WHERE { GRAPH activation:u1 {?s diffusion:initial-activation ?o}}"
           result (dj/direct-query dataset query)]     
           (to-map result)) => {"i1" 1.0 "i2" 0.0 "i3" 1.0 "i4" 0.0 "i5" 1.0})
     
 (facts "We can count users->items, items->tags, items->users, tags->items"
-    (let [dataset (counts-users-to-items graph2)
+    (let [dataset (counts-users-to-items (mk-graph2))
           query "PREFIX diffusion: <http://rhizomik.net/diffusion#>
                  PREFIX activation: <http://rhizomik.net/diffusion/activation/> 
                  SELECT ?s ?o
@@ -180,7 +181,7 @@
                          GRAPH activation:counters { ?s diffusion:num-items ?o } }"
           result (dj/direct-query dataset query)]
           (to-map result)) => {"u1" 3 "u2" 3 "u3" 4}
-    (let [dataset (counts-items-to-users graph2)
+    (let [dataset (counts-items-to-users (mk-graph2))
           query "PREFIX diffusion: <http://rhizomik.net/diffusion#>
                  PREFIX activation: <http://rhizomik.net/diffusion/activation/> 
                  SELECT ?s ?o
@@ -188,7 +189,7 @@
                          GRAPH activation:counters { ?s diffusion:num-users ?o } }"
           result (dj/direct-query dataset query)]
           (to-map result)) => {"i1" 2 "i2" 2 "i3" 2 "i4" 2 "i5" 2}
-    (let [dataset (counts-items-to-tags graph2)
+    (let [dataset (counts-items-to-tags (mk-graph2))
           query "PREFIX diffusion: <http://rhizomik.net/diffusion#>
                  PREFIX activation: <http://rhizomik.net/diffusion/activation/> 
                  SELECT ?s ?o
@@ -196,7 +197,7 @@
                        GRAPH activation:counters { ?s diffusion:num-tags ?o } }"
           result (dj/direct-query dataset query)]
           (to-map result)) => {"i1" 3 "i2" 2 "i3" 2 "i4" 2 "i5" 1}
-    (let [dataset (counts-tags-to-items graph2)
+    (let [dataset (counts-tags-to-items (mk-graph2))
         query "PREFIX diffusion: <http://rhizomik.net/diffusion#>
                PREFIX activation: <http://rhizomik.net/diffusion/activation/> 
                SELECT ?s ?o
@@ -204,3 +205,32 @@
                      GRAPH activation:counters { ?s diffusion:num-items ?o } }"
         result (dj/direct-query dataset query)]
         (to-map result)) => {"t1" 2 "t2" 2 "t3" 3 "t4" 3})
+        
+(fact "We can propagate the initial activation to the users"
+    (let [dataset (-> (mk-graph2)
+                      (initial-activations "u1")
+                      counts-items-to-users
+                      (activate-users-from-items "u1"))
+          query "PREFIX diffusion: <http://rhizomik.net/diffusion#>
+                 PREFIX activation: <http://rhizomik.net/diffusion/activation/> 
+                 SELECT ?s ?o
+                 WHERE { GRAPH activation:u1 { ?s diffusion:from-items ?o } }"
+          result (dj/direct-query dataset query)]
+          (to-map result)) => { "u1" 1.5 "u2" 0.5 "u3" 1.0 })
+
+(fact "We can propagate the activations back to the items"
+    (let [dataset (-> (mk-graph2)
+                      (initial-activations "u1")
+                      counts-items-to-users
+                      counts-users-to-items
+                      (activate-users-from-items "u1")
+                      (activate-items-from-users "u1"))
+          query "PREFIX diffusion: <http://rhizomik.net/diffusion#>
+                 PREFIX activation: <http://rhizomik.net/diffusion/activation/> 
+                 SELECT ?s ?o
+                 WHERE { GRAPH activation:u1 { ?s diffusion:from-users ?o } }"
+          result (dj/direct-query dataset query)]
+          (to-map result)) => (contains ["i2" (roughly (/ 5.0 12.0))] 
+                                        ["i4" (roughly (/ 5.0 12.0))]
+                                        :in-any-order))
+

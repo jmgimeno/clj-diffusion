@@ -12,6 +12,7 @@
 (prc/register-rdf-ns :item "http://rhizomik.net/diffusion/item/")
 (prc/register-rdf-ns :tag "http://rhizomik.net/diffusion/tag/")
 (prc/register-rdf-ns :activation "http://rhizomik.net/diffusion/activation/")
+(prc/register-rdf-ns :xsd "http://www.w3.org/2001/XMLSchema#")
 
 (defn make-user [user]
     (prc/rdf-resource :user user))
@@ -194,7 +195,7 @@
                            PREFIX user: <%2$s>
                            PREFIX activation: <%3$s>
                            INSERT INTO activation:%4$s
-                           { ?item diffusion:has-activation 0.0 }
+                           { ?item diffusion:initial-activation 0.0 }
                            WHERE { ?item a diffusion:Item .
                                    FILTER NOT EXISTS { user:%4$s diffusion:has-reviewed ?item } }"
                            diffusion-ns
@@ -205,7 +206,7 @@
                            PREFIX user: <%2$s>
                            PREFIX activation: <%3$s>
                            INSERT INTO activation:%4$s
-                           { ?item diffusion:has-activation 1.0 }
+                           { ?item diffusion:initial-activation 1.0 }
                             WHERE { user:%4$s diffusion:has-reviewed ?item }"
                            diffusion-ns
                            user-ns
@@ -283,3 +284,47 @@
         (-> datasource
             (create-namedgraph-if-needed (str activation-ns "counters"))
             (dj/direct-update sparql))))
+            
+(defn activate-users-from-items [datasource user]
+    (let [diffusion-ns (prc/find-ns-registry :diffusion)
+          activation-ns (prc/find-ns-registry :activation)
+          xsd-ns (prc/find-ns-registry :xsd)
+          sparql (format "PREFIX diffusion: <%1$s>
+                          PREFIX activation: <%2$s> 
+                          PREFIX xsd: <%3$s>
+                          INSERT INTO activation:%4$s
+                          { ?user diffusion:from-items ?accum }
+                          WHERE { SELECT ?user (SUM(?equity) AS ?accum)
+                                  WHERE { SELECT ?user (xsd:double(?activation/?degree) AS ?equity) 
+                                          WHERE { ?user a diffusion:User .
+                                                  ?user diffusion:has-reviewed ?item .
+                                                  GRAPH activation:%4$s { ?item diffusion:initial-activation ?activation }
+                                                  GRAPH activation:counters { ?item diffusion:num-users ?degree }}}
+                                  GROUP BY ?user}"
+                          diffusion-ns
+                          activation-ns
+                          xsd-ns
+                          user)]
+        (dj/direct-update datasource sparql)))
+        
+(defn activate-items-from-users [datasource user]
+    (let [diffusion-ns (prc/find-ns-registry :diffusion)
+          activation-ns (prc/find-ns-registry :activation)
+          xsd-ns (prc/find-ns-registry :xsd)
+          sparql (format "PREFIX diffusion: <%1$s>
+                          PREFIX activation: <%2$s> 
+                          PREFIX xsd: <%3$s>
+                          INSERT INTO activation:%4$s
+                          { ?item diffusion:from-users ?accum }
+                          WHERE { SELECT ?item (SUM(?equity) AS ?accum)
+                                  WHERE { SELECT ?item (xsd:double(?activation/?degree) AS ?equity) 
+                                          WHERE { ?item a diffusion:Item .
+                                                  ?user diffusion:has-reviewed ?item .
+                                                  GRAPH activation:%4$s { ?user diffusion:from-items ?activation }
+                                                  GRAPH activation:counters { ?user diffusion:num-items ?degree }}}
+                                  GROUP BY ?item}"
+                          diffusion-ns
+                          activation-ns
+                          xsd-ns
+                          user)]
+        (dj/direct-update datasource sparql)))
