@@ -191,26 +191,31 @@
     (let [activation-ns (prc/find-ns-registry :activation)
           user-ns (prc/find-ns-registry :user)
           diffusion-ns (prc/find-ns-registry :diffusion)
+          xsd-ns (prc/find-ns-registry :xsd)
           update0 (format "PREFIX diffusion: <%1$s>
                            PREFIX user: <%2$s>
                            PREFIX activation: <%3$s>
-                           INSERT INTO activation:%4$s
-                           { ?item diffusion:initial-activation 0.0 }
+                           PREFIX xsd: <%4$s>
+                           INSERT INTO activation:%5$s
+                           { ?item diffusion:initial-activation \"0.0\"^^xsd:double }
                            WHERE { ?item a diffusion:Item .
-                                   FILTER NOT EXISTS { user:%4$s diffusion:has-reviewed ?item } }"
+                                   FILTER NOT EXISTS { user:%5$s diffusion:has-reviewed ?item } }"
                            diffusion-ns
                            user-ns
                            activation-ns
+                           xsd-ns
                            user)
           update1 (format "PREFIX diffusion: <%1$s>
                            PREFIX user: <%2$s>
                            PREFIX activation: <%3$s>
-                           INSERT INTO activation:%4$s
-                           { ?item diffusion:initial-activation 1.0 }
-                            WHERE { user:%4$s diffusion:has-reviewed ?item }"
+                           PREFIX xsd: <%4$s>
+                           INSERT INTO activation:%5$s
+                           { ?item diffusion:initial-activation \"1.0\"^^xsd:double }
+                            WHERE { user:%5$s diffusion:has-reviewed ?item }"
                            diffusion-ns
                            user-ns
                            activation-ns
+                           xsd-ns
                            user)]
           (-> datasource
               (create-namedgraph-if-needed (str activation-ns user))
@@ -294,7 +299,7 @@
                           PREFIX xsd: <%3$s>
                           INSERT INTO activation:%4$s
                           { ?user diffusion:from-items ?accum }
-                          WHERE { SELECT ?user (SUM(xsd:double(?activation/?degree)) AS ?accum)
+                          WHERE { SELECT ?user (SUM(?activation/?degree) AS ?accum)
                                   WHERE  { ?user a diffusion:User .
                                            ?user diffusion:has-reviewed ?item .
                                            GRAPH activation:%4$s { ?item diffusion:initial-activation ?activation }
@@ -315,7 +320,7 @@
                           PREFIX xsd: <%3$s>
                           INSERT INTO activation:%4$s
                           { ?item diffusion:from-users ?accum }
-                          WHERE { SELECT ?item (SUM(xsd:double(?activation/?degree)) AS ?accum)
+                          WHERE { SELECT ?item (SUM(?activation/?degree) AS ?accum)
                                   WHERE { ?item a diffusion:Item .
                                           ?user diffusion:has-reviewed ?item .
                                           GRAPH activation:%4$s { ?user diffusion:from-items ?activation }
