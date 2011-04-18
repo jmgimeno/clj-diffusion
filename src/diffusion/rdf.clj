@@ -198,37 +198,32 @@
 
  
 (defn initial-activations [datasource user]
-    (let [activation-ns (prc/find-ns-registry :activation)
-          user-ns (prc/find-ns-registry :user)
+    (let [user-ns (prc/find-ns-registry :user)
           diffusion-ns (prc/find-ns-registry :diffusion)
           xsd-ns (prc/find-ns-registry :xsd)
           update0 (format "PREFIX diffusion: <%1$s>
                            PREFIX user: <%2$s>
-                           PREFIX activation: <%3$s>
-                           PREFIX xsd: <%4$s>
-                           INSERT INTO activation:%5$s
+                           PREFIX xsd: <%3$s>
+                           INSERT INTO user:%4$s
                            { ?item diffusion:initial-activation \"0.0\"^^xsd:double }
                            WHERE { ?item a diffusion:Item .
-                                   FILTER NOT EXISTS { user:%5$s diffusion:has-reviewed ?item } }"
+                                   FILTER NOT EXISTS { user:%4$s diffusion:has-reviewed ?item } }"
                            diffusion-ns
                            user-ns
-                           activation-ns
                            xsd-ns
                            user)
           update1 (format "PREFIX diffusion: <%1$s>
                            PREFIX user: <%2$s>
-                           PREFIX activation: <%3$s>
-                           PREFIX xsd: <%4$s>
-                           INSERT INTO activation:%5$s
+                           PREFIX xsd: <%3$s>
+                           INSERT INTO user:%4$s
                            { ?item diffusion:initial-activation \"1.0\"^^xsd:double }
-                            WHERE { user:%5$s diffusion:has-reviewed ?item }"
+                            WHERE { user:%4$s diffusion:has-reviewed ?item }"
                            diffusion-ns
                            user-ns
-                           activation-ns
                            xsd-ns
                            user)]
           (-> datasource
-              (create-namedgraph-if-needed (str activation-ns user))
+              (create-namedgraph-if-needed (str user-ns user))
               (dj/direct-update update0)
               (dj/direct-update update1))))
           
@@ -303,42 +298,42 @@
 (defn activate-users-from-items [datasource user]
     (let [diffusion-ns (prc/find-ns-registry :diffusion)
           activation-ns (prc/find-ns-registry :activation)
-          xsd-ns (prc/find-ns-registry :xsd)
+          user-ns (prc/find-ns-registry :user)
           sparql (format "PREFIX diffusion: <%1$s>
                           PREFIX activation: <%2$s> 
-                          PREFIX xsd: <%3$s>
-                          INSERT INTO activation:%4$s
+                          PREFIX user: <%3$s>
+                          INSERT INTO user:%4$s
                           { ?user diffusion:from-items ?accum }
                           WHERE { SELECT ?user (SUM(?activation/?degree) AS ?accum)
                                   WHERE  { ?user a diffusion:User .
                                            ?user diffusion:has-reviewed ?item .
-                                           GRAPH activation:%4$s { ?item diffusion:initial-activation ?activation }
+                                           GRAPH user:%4$s { ?item diffusion:initial-activation ?activation }
                                            GRAPH activation:counters { ?item diffusion:num-users ?degree } }
                                   GROUP BY ?user }"
                           diffusion-ns
                           activation-ns
-                          xsd-ns
+                          user-ns
                           user)]
         (dj/direct-update datasource sparql)))
         
 (defn activate-items-from-users [datasource user]
     (let [diffusion-ns (prc/find-ns-registry :diffusion)
           activation-ns (prc/find-ns-registry :activation)
-          xsd-ns (prc/find-ns-registry :xsd)
+          user-ns (prc/find-ns-registry :user)
           sparql (format "PREFIX diffusion: <%1$s>
                           PREFIX activation: <%2$s> 
-                          PREFIX xsd: <%3$s>
-                          INSERT INTO activation:%4$s
+                          PREFIX user: <%3$s>
+                          INSERT INTO user:%4$s
                           { ?item diffusion:from-users ?accum }
                           WHERE { SELECT ?item (SUM(?activation/?degree) AS ?accum)
                                   WHERE { ?item a diffusion:Item .
                                           ?user diffusion:has-reviewed ?item .
-                                          GRAPH activation:%4$s { ?user diffusion:from-items ?activation }
+                                          GRAPH user:%4$s { ?user diffusion:from-items ?activation }
                                           GRAPH activation:counters { ?user diffusion:num-items ?degree } }
                                   GROUP BY ?item }"
                           diffusion-ns
                           activation-ns
-                          xsd-ns
+                          user-ns
                           user)]
         (dj/direct-update datasource sparql)))
 
@@ -346,21 +341,21 @@
 (defn activate-tags-from-items [datasource user]
     (let [diffusion-ns (prc/find-ns-registry :diffusion)
           activation-ns (prc/find-ns-registry :activation)
-          xsd-ns (prc/find-ns-registry :xsd)
+          user-ns (prc/find-ns-registry :user)
           sparql (format "PREFIX diffusion: <%1$s>
                           PREFIX activation: <%2$s> 
-                          PREFIX xsd: <%3$s>
-                          INSERT INTO activation:%4$s
+                          PREFIX user: <%3$s>
+                          INSERT INTO user:%4$s
                           { ?tag diffusion:from-items ?accum }
                           WHERE { SELECT ?tag (SUM(?activation/?degree) AS ?accum)
                                   WHERE  { ?tag a diffusion:Tag .
                                            ?item diffusion:has-tag ?tag .
-                                           GRAPH activation:%4$s { ?item diffusion:initial-activation ?activation }
+                                           GRAPH user:%4$s { ?item diffusion:initial-activation ?activation }
                                            GRAPH activation:counters { ?item diffusion:num-tags ?degree } }
                                   GROUP BY ?tag }"
                           diffusion-ns
                           activation-ns
-                          xsd-ns
+                          user-ns
                           user)]
         (dj/direct-update datasource sparql)))
         
@@ -368,20 +363,21 @@
 (defn activate-items-from-tags [datasource user]
     (let [diffusion-ns (prc/find-ns-registry :diffusion)
           activation-ns (prc/find-ns-registry :activation)
-          xsd-ns (prc/find-ns-registry :xsd)
+          user-ns (prc/find-ns-registry :user)
           sparql (format "PREFIX diffusion: <%1$s>
                           PREFIX activation: <%2$s> 
-                          PREFIX xsd: <%3$s>
-                          INSERT INTO activation:%4$s
+                          PREFIX user: <%3$s>
+                          INSERT INTO user:%4$s
                           { ?item diffusion:from-tags ?accum }
                           WHERE { SELECT ?item (SUM(?activation/?degree) AS ?accum)
                                   WHERE { ?item a diffusion:Item .
                                           ?item diffusion:has-tag ?tag .
-                                          GRAPH activation:%4$s { ?tag diffusion:from-items ?activation }
+                                          GRAPH user:%4$s { ?tag diffusion:from-items ?activation }
                                           GRAPH activation:counters { ?tag diffusion:num-items ?degree } }
                                   GROUP BY ?item }"
                           diffusion-ns
                           activation-ns
-                          xsd-ns
+                          user-ns
                           user)]
         (dj/direct-update datasource sparql)))
+

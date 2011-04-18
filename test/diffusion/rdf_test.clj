@@ -166,9 +166,9 @@
 (fact "The initial activations for a user are 1.0 for the items reviewed and zero otherwise"
     (let [dataset (initial-activations (mk-graph2) "u1")
           query "PREFIX diffusion: <http://rhizomik.net/diffusion#>
-                 PREFIX activation: <http://rhizomik.net/diffusion/activation/> 
+                 PREFIX user: <http://rhizomik.net/diffusion/user/>
                  SELECT ?s ?o
-                 WHERE { GRAPH activation:u1 {?s diffusion:initial-activation ?o}}"
+                 WHERE { GRAPH user:u1 {?s diffusion:initial-activation ?o}}"
           result (dj/direct-query dataset query)]     
           (to-map result)) => {"i1" 1.0 "i2" 0.0 "i3" 1.0 "i4" 0.0 "i5" 1.0})
     
@@ -212,9 +212,9 @@
                       counts-items-to-users
                       (activate-users-from-items "u1"))
           query "PREFIX diffusion: <http://rhizomik.net/diffusion#>
-                 PREFIX activation: <http://rhizomik.net/diffusion/activation/> 
+                 PREFIX user: <http://rhizomik.net/diffusion/user/>
                  SELECT ?s ?o
-                 WHERE { GRAPH activation:u1 { ?s diffusion:from-items ?o } }"
+                 WHERE { GRAPH user:u1 { ?s diffusion:from-items ?o } }"
           result (dj/direct-query dataset query)]
           (to-map result)) => { "u1" 1.5 "u2" 0.5 "u3" 1.0 })
 
@@ -226,9 +226,9 @@
                       (activate-users-from-items "u1")
                       (activate-items-from-users "u1"))
           query "PREFIX diffusion: <http://rhizomik.net/diffusion#>
-                 PREFIX activation: <http://rhizomik.net/diffusion/activation/> 
+                 PREFIX user: <http://rhizomik.net/diffusion/user/>
                  SELECT ?s ?o
-                 WHERE { GRAPH activation:u1 { ?s diffusion:from-users ?o } }"
+                 WHERE { GRAPH user:u1 { ?s diffusion:from-users ?o } }"
           result (dj/direct-query dataset query)]
           (to-map result)) => (just ["i1" (roughly (/ 3.0  4.0))]
                                     ["i2" (roughly (/ 5.0 12.0))]
@@ -243,9 +243,9 @@
                       counts-items-to-tags
                       (activate-tags-from-items "u1"))
           query "PREFIX diffusion: <http://rhizomik.net/diffusion#>
-                 PREFIX activation: <http://rhizomik.net/diffusion/activation/> 
+                 PREFIX user: <http://rhizomik.net/diffusion/user/>
                  SELECT ?s ?o
-                 WHERE { GRAPH activation:u1 { ?s diffusion:from-items ?o } }"
+                 WHERE { GRAPH user:u1 { ?s diffusion:from-items ?o } }"
           result (dj/direct-query dataset query)]
           (to-map result)) => (just ["t1" (roughly (/ 1.0 3.0))]
                                     ["t2" (roughly (/ 5.0 6.0))] 
@@ -261,9 +261,9 @@
                       (activate-tags-from-items "u1")
                       (activate-items-from-tags "u1"))
           query "PREFIX diffusion: <http://rhizomik.net/diffusion#>
-                 PREFIX activation: <http://rhizomik.net/diffusion/activation/> 
+                 PREFIX user: <http://rhizomik.net/diffusion/user/>
                  SELECT ?s ?o
-                 WHERE { GRAPH activation:u1 { ?s diffusion:from-tags ?o } }"
+                 WHERE { GRAPH user:u1 { ?s diffusion:from-tags ?o } }"
           result (dj/direct-query dataset query)]
           (to-map result)) => (just ["i1" (roughly (/  31.0  36.0))] 
                                     ["i2" (roughly (/   1.0   2.0))] 
