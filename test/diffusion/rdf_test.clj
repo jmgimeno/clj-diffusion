@@ -230,7 +230,47 @@
                  SELECT ?s ?o
                  WHERE { GRAPH activation:u1 { ?s diffusion:from-users ?o } }"
           result (dj/direct-query dataset query)]
-          (to-map result)) => (contains ["i2" (roughly (/ 5.0 12.0))] 
-                                        ["i4" (roughly (/ 5.0 12.0))]
-                                        :in-any-order))
+          (to-map result)) => (just ["i1" (roughly (/ 3.0  4.0))]
+                                    ["i2" (roughly (/ 5.0 12.0))]
+                                    ["i3" (roughly (/ 2.0  3.0))]
+                                    ["i4" (roughly (/ 5.0 12.0))]
+                                    ["i5" (roughly (/ 3.0  4.0))]
+                                    :in-any-order))
 
+(fact "We can propagate the initial activation to the tags"
+    (let [dataset (-> (mk-graph2)
+                      (initial-activations "u1")
+                      counts-items-to-tags
+                      (activate-tags-from-items "u1"))
+          query "PREFIX diffusion: <http://rhizomik.net/diffusion#>
+                 PREFIX activation: <http://rhizomik.net/diffusion/activation/> 
+                 SELECT ?s ?o
+                 WHERE { GRAPH activation:u1 { ?s diffusion:from-items ?o } }"
+          result (dj/direct-query dataset query)]
+          (to-map result)) => (just ["t1" (roughly (/ 1.0 3.0))]
+                                    ["t2" (roughly (/ 5.0 6.0))] 
+                                    ["t3" (roughly 1.0)] 
+                                    ["t4" (roughly (/ 5.0 6.0))] 
+                                    :in-any-order))
+
+(fact "We can propagate the activations back to the items"
+    (let [dataset (-> (mk-graph2)
+                      (initial-activations "u1")
+                      counts-items-to-tags
+                      counts-tags-to-items
+                      (activate-tags-from-items "u1")
+                      (activate-items-from-tags "u1"))
+          query "PREFIX diffusion: <http://rhizomik.net/diffusion#>
+                 PREFIX activation: <http://rhizomik.net/diffusion/activation/> 
+                 SELECT ?s ?o
+                 WHERE { GRAPH activation:u1 { ?s diffusion:from-tags ?o } }"
+          result (dj/direct-query dataset query)]
+          (to-map result)) => (just ["i1" (roughly (/  31.0  36.0))] 
+                                    ["i2" (roughly (/   1.0   2.0))] 
+                                    ["i3" (roughly (/  25.0  36.0))] 
+                                    ["i4" (roughly (/  11.0  18.0))]
+                                    ["i5" (roughly (/   1.0   3.0))]
+                                    :in-any-order))
+
+
+                                    

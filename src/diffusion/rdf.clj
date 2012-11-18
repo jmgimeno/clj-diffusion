@@ -16,25 +16,31 @@
 
 (defn make-user [user]
     (prc/rdf-resource :user user))
-    
+
+  
 (defn make-item [item]
     (prc/rdf-resource :item item))
     
+
 (defn make-tag [tag]
     (prc/rdf-resource :tag tag))
+
 
 (defn user? [resource]
     (= (prc/resource-qname-prefix resource)
        (prc/find-ns-registry :user)))
     
+
 (defn item? [resource]
     (= (prc/resource-qname-prefix resource)
        (prc/find-ns-registry :item)))
     
+
 (defn tag? [resource]
     (= (prc/resource-qname-prefix resource)
        (prc/find-ns-registry :tag)))
     
+
 (defn new-graph []
     (dj/build-datasource))
 
@@ -49,13 +55,15 @@
         (prc/model-add-triples 
             [[(make-item item) prc/rdf:type [:diffusion :Item]]]))
     datasource)
-    
+
+ 
 (defn add-tag [datasource tag]
     (prc/with-model datasource
         (prc/model-add-triples 
             [[(make-tag tag) prc/rdf:type [:diffusion :Tag]]]))
     datasource)
     
+
 (defn add-review [datasource user item]
     (let [user-resource (make-user user)
           item-resource (make-item item)]
@@ -75,7 +83,8 @@
             (prc/model-add-triples
                 [[item-resource [:diffusion :has-tag] tag-resource]]))
         datasource))
-     
+    
+
 (defn- count-relation [datasource {subject :subject property :property object :object}]
     (->> (format "PREFIX diffusion: <%1$s> 
                   PREFIX user: <%2$s>
@@ -186,7 +195,8 @@
     (if (dj/contains-named-model datasource uri)
         datasource
         (dj/add-named-model datasource uri (prc/build-model))))
-    
+
+ 
 (defn initial-activations [datasource user]
     (let [activation-ns (prc/find-ns-registry :activation)
           user-ns (prc/find-ns-registry :user)
@@ -325,6 +335,50 @@
                                           ?user diffusion:has-reviewed ?item .
                                           GRAPH activation:%4$s { ?user diffusion:from-items ?activation }
                                           GRAPH activation:counters { ?user diffusion:num-items ?degree } }
+                                  GROUP BY ?item }"
+                          diffusion-ns
+                          activation-ns
+                          xsd-ns
+                          user)]
+        (dj/direct-update datasource sparql)))
+
+        
+(defn activate-tags-from-items [datasource user]
+    (let [diffusion-ns (prc/find-ns-registry :diffusion)
+          activation-ns (prc/find-ns-registry :activation)
+          xsd-ns (prc/find-ns-registry :xsd)
+          sparql (format "PREFIX diffusion: <%1$s>
+                          PREFIX activation: <%2$s> 
+                          PREFIX xsd: <%3$s>
+                          INSERT INTO activation:%4$s
+                          { ?tag diffusion:from-items ?accum }
+                          WHERE { SELECT ?tag (SUM(?activation/?degree) AS ?accum)
+                                  WHERE  { ?tag a diffusion:Tag .
+                                           ?item diffusion:has-tag ?tag .
+                                           GRAPH activation:%4$s { ?item diffusion:initial-activation ?activation }
+                                           GRAPH activation:counters { ?item diffusion:num-tags ?degree } }
+                                  GROUP BY ?tag }"
+                          diffusion-ns
+                          activation-ns
+                          xsd-ns
+                          user)]
+        (dj/direct-update datasource sparql)))
+        
+
+(defn activate-items-from-tags [datasource user]
+    (let [diffusion-ns (prc/find-ns-registry :diffusion)
+          activation-ns (prc/find-ns-registry :activation)
+          xsd-ns (prc/find-ns-registry :xsd)
+          sparql (format "PREFIX diffusion: <%1$s>
+                          PREFIX activation: <%2$s> 
+                          PREFIX xsd: <%3$s>
+                          INSERT INTO activation:%4$s
+                          { ?item diffusion:from-tags ?accum }
+                          WHERE { SELECT ?item (SUM(?activation/?degree) AS ?accum)
+                                  WHERE { ?item a diffusion:Item .
+                                          ?item diffusion:has-tag ?tag .
+                                          GRAPH activation:%4$s { ?tag diffusion:from-items ?activation }
+                                          GRAPH activation:counters { ?tag diffusion:num-items ?degree } }
                                   GROUP BY ?item }"
                           diffusion-ns
                           activation-ns
